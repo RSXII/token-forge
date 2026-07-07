@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Token Forge</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #08080d;
+    --surface: #0c0c14;
+    --border: #16161f;
+    --text: #b0b0be;
+    --text-dim: #4a4a5a;
+    --text-faint: #33333f;
+    --text-light: #d0c8bc;
+    --text-mid: #7a7a8a;
+    --hover: #2e2e3a;
+
+    --theme-primary: #8b1a2b;
+    --theme-secondary: #c4344d;
+    --theme-accent: #ff4466;
+    --theme-glow: rgba(196, 52, 77, 0.4);
+    --theme-glow-strong: rgba(255, 68, 102, 0.6);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Georgia', 'Times New Roman', serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 36px 16px;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .header { text-align: center; margin-bottom: 30px; }
+
+  .header-sub {
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: #3e3e50;
+    text-transform: uppercase;
+    font-family: 'Courier New', monospace;
+    margin-bottom: 8px;
+  }
+
+  .header h1 {
+    font-size: 26px;
+    font-weight: 400;
+    color: var(--text-light);
+    letter-spacing: 5px;
+    font-variant: small-caps;
+  }
+
+  .header-line {
+    width: 50px;
+    height: 1px;
+    margin: 10px auto 0;
+    background: linear-gradient(90deg, transparent, var(--theme-secondary), transparent);
+    transition: background 0.5s;
+  }
+
+  /* Theme tabs */
+  .tabs {
+    display: flex;
+    border: 1px solid var(--border);
+    margin-bottom: 28px;
+    overflow: hidden;
+  }
+
+  .tab {
+    padding: 9px 24px;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--border);
+    color: #3e3e50;
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 3px;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-variant: small-caps;
+    transition: all 0.3s;
+    position: relative;
+  }
+
+  .tab:last-child { border-right: none; }
+
+  .tab.active { color: var(--theme-accent); background: color-mix(in srgb, var(--theme-primary) 15%, transparent); }
+
+  .tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 20%;
+    right: 20%;
+    height: 1.5px;
+    background: var(--theme-secondary);
+    box-shadow: 0 0 8px var(--theme-glow);
+  }
+
+  .tab-icon { margin-right: 6px; font-size: 7px; vertical-align: middle; }
+
+  /* Canvas area */
+  .canvas-wrap {
+    position: relative;
+    width: 420px;
+    height: 420px;
+    margin-bottom: 28px;
+  }
+
+  #tokenCanvas {
+    border-radius: 50%;
+    box-shadow: 0 0 30px rgba(0,0,0,0.6), 0 0 15px var(--theme-glow);
+    transition: box-shadow 0.3s;
+    touch-action: none;
+  }
+
+  #tokenCanvas.drag-over {
+    box-shadow: 0 0 40px var(--theme-glow-strong);
+  }
+
+  .drop-prompt {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 50%;
+    pointer-events: all;
+  }
+
+  .drop-prompt.hidden { display: none; }
+
+  .drop-icon {
+    width: 38px; height: 38px;
+    border: 1px solid color-mix(in srgb, var(--theme-secondary) 27%, transparent);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: var(--theme-secondary);
+    margin-bottom: 10px;
+  }
+
+  .drop-label {
+    font-size: 13px;
+    color: var(--text-mid);
+    letter-spacing: 3px;
+    font-variant: small-caps;
+  }
+
+  .drop-sub {
+    font-size: 9px;
+    color: var(--text-faint);
+    margin-top: 5px;
+    font-family: 'Courier New', monospace;
+  }
+
+  /* Controls */
+  .controls {
+    width: 100%;
+    max-width: 380px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .controls.hidden { display: none; }
+
+  .scale-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .scale-label {
+    font-size: 9px;
+    letter-spacing: 4px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    font-family: 'Courier New', monospace;
+  }
+
+  .scale-value {
+    font-size: 9px;
+    color: var(--text-faint);
+    font-family: 'Courier New', monospace;
+  }
+
+  #zoomSlider {
+    width: 100%;
+    accent-color: var(--theme-secondary);
+    height: 2px;
+  }
+
+  .drag-hint {
+    font-size: 9px;
+    color: var(--hover);
+    text-align: center;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1px;
+  }
+
+  .buttons { display: flex; gap: 10px; }
+
+  .btn {
+    flex: 1;
+    padding: 10px 0;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 3px;
+    cursor: pointer;
+    font-variant: small-caps;
+    transition: all 0.3s;
+  }
+
+  .btn:hover { border-color: var(--hover); color: var(--text-mid); }
+
+  .btn-save {
+    flex: 1.6;
+    padding: 10px 0;
+    background: color-mix(in srgb, var(--theme-primary) 20%, transparent);
+    border: 1px solid color-mix(in srgb, var(--theme-secondary) 33%, transparent);
+    color: var(--theme-accent);
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 3px;
+    cursor: pointer;
+    font-variant: small-caps;
+    transition: all 0.3s;
+    box-shadow: 0 0 12px var(--theme-glow);
+  }
+
+  .btn-save:hover { box-shadow: 0 0 22px var(--theme-glow-strong); }
+
+  #fileInput { display: none; }
+
+  @media (max-width: 480px) {
+    .canvas-wrap { width: 320px; height: 320px; }
+    #tokenCanvas { width: 320px; height: 320px; }
+    .tabs { flex-wrap: wrap; }
+    .tab { padding: 8px 16px; font-size: 11px; letter-spacing: 2px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-sub">Campaign Tools</div>
+  <h1>Token Forge</h1>
+  <div class="header-line" id="headerLine"></div>
+</div>
+
+<div class="tabs" id="tabs">
+  <button class="tab active" data-theme="enemy"><span class="tab-icon">◆</span>Enemy</button>
+  <button class="tab" data-theme="friendly"><span class="tab-icon">◈</span>Friendly</button>
+  <button class="tab" data-theme="neutral"><span class="tab-icon">◇</span>Neutral</button>
+</div>
+
+<div class="canvas-wrap"
+     id="canvasWrap"
+     ondragover="event.preventDefault(); document.getElementById('tokenCanvas').classList.add('drag-over');"
+     ondragleave="document.getElementById('tokenCanvas').classList.remove('drag-over');"
+>
+  <canvas id="tokenCanvas" width="420" height="420"></canvas>
+  <div class="drop-prompt" id="dropPrompt">
+    <div class="drop-icon">↑</div>
+    <div class="drop-label">Drop Portrait</div>
+    <div class="drop-sub">or click to browse</div>
+  </div>
+</div>
+
+<div class="controls hidden" id="controls">
+  <div>
+    <div class="scale-header">
+      <span class="scale-label">Scale</span>
+      <span class="scale-value" id="scaleValue">100%</span>
+    </div>
+    <input type="range" id="zoomSlider" min="0.05" max="4" step="0.001" value="1">
+  </div>
+  <div class="drag-hint">drag portrait to reposition</div>
+  <div class="buttons">
+    <button class="btn" id="btnClear">Clear</button>
+    <button class="btn" id="btnNew">New Image</button>
+    <button class="btn-save" id="btnSave">Save Token</button>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept="image/*">
+
+<script>
+const TOKEN_SIZE = 420;
+const BORDER_BAND = 20;
+const INNER_RADIUS = TOKEN_SIZE / 2 - BORDER_BAND - 8;
+
+const THEMES = {
+  enemy: {
+    primary: "#8b1a2b", secondary: "#c4344d", accent: "#ff4466",
+    glow: "rgba(196, 52, 77, 0.4)", glowStrong: "rgba(255, 68, 102, 0.6)",
+    ring: "#5a1020", filigree: "#a02040",
+  },
+  friendly: {
+    primary: "#1a6b5a", secondary: "#2a9e82", accent: "#40e0b8",
+    glow: "rgba(42, 158, 130, 0.35)", glowStrong: "rgba(64, 224, 184, 0.5)",
+    ring: "#0e3d32", filigree: "#1f7a64",
+  },
+  neutral: {
+    primary: "#8b7330", secondary: "#c9a84c", accent: "#f0d060",
+    glow: "rgba(201, 168, 76, 0.35)", glowStrong: "rgba(240, 208, 96, 0.55)",
+    ring: "#5a4a18", filigree: "#b8952e",
+  },
+};
+
+// State
+let currentTheme = "enemy";
+let imgEl = null;
+let zoom = 1;
+let panX = 0, panY = 0;
+let zoomBase = 1;
+let isDragging = false;
+let dragStartX = 0, dragStartY = 0;
+
+// Elements
+const canvas = document.getElementById("tokenCanvas");
+const ctx = canvas.getContext("2d");
+const dropPrompt = document.getElementById("dropPrompt");
+const controls = document.getElementById("controls");
+const zoomSlider = document.getElementById("zoomSlider");
+const scaleValue = document.getElementById("scaleValue");
+const fileInput = document.getElementById("fileInput");
+const canvasWrap = document.getElementById("canvasWrap");
+const headerLine = document.getElementById("headerLine");
+
+// --- Drawing ---
+
+function drawTokenBorder(ctx, size, theme) {
+  const cx = size / 2, cy = size / 2;
+  const outerR = size / 2 - 3;
+  const innerR = INNER_RADIUS;
+
+  // Ambient glow
+  ctx.save();
+  ctx.shadowColor = theme.accent;
+  ctx.shadowBlur = 25;
+  ctx.beginPath();
+  ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(0,0,0,0)";
+  ctx.lineWidth = 6;
+  ctx.stroke();
+  ctx.restore();
+
+  // Dark band fill
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+  ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true);
+  const grad = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+  grad.addColorStop(0, "#0a0a10");
+  grad.addColorStop(0.4, "#0f0f18");
+  grad.addColorStop(1, "#08080e");
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.restore();
+
+  // Filigree
+  const segCount = 8, segGap = 0.04;
+  const midR = (outerR + innerR) / 2;
+
+  for (let i = 0; i < segCount; i++) {
+    const sa = (i / segCount) * Math.PI * 2 - Math.PI / 2 + segGap;
+    const ea = ((i + 1) / segCount) * Math.PI * 2 - Math.PI / 2 - segGap;
+    const ma = (sa + ea) / 2;
+
+    ctx.save();
+    ctx.shadowColor = theme.glow;
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.arc(cx, cy, midR, sa + 0.06, ea - 0.06);
+    ctx.strokeStyle = theme.filigree + "66";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerR + (midR - innerR) * 0.35, sa + 0.12, ea - 0.12);
+    ctx.strokeStyle = theme.filigree + "33";
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR - (outerR - midR) * 0.35, sa + 0.12, ea - 0.12);
+    ctx.strokeStyle = theme.filigree + "33";
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+
+    // Diamond node
+    const nx = cx + Math.cos(ma) * midR;
+    const ny = cy + Math.sin(ma) * midR;
+    ctx.save();
+    ctx.shadowColor = theme.accent;
+    ctx.shadowBlur = 6;
+    ctx.translate(nx, ny);
+    ctx.rotate(ma + Math.PI / 4);
+    ctx.fillStyle = theme.secondary;
+    ctx.fillRect(-2.2, -2.2, 4.4, 4.4);
+    ctx.restore();
+
+    // Radial tick
+    const ba = (i / segCount) * Math.PI * 2 - Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(ba) * (innerR + 3), cy + Math.sin(ba) * (innerR + 3));
+    ctx.lineTo(cx + Math.cos(ba) * (outerR - 3), cy + Math.sin(ba) * (outerR - 3));
+    ctx.strokeStyle = theme.ring + "88";
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+  }
+
+  // Inner ring
+  ctx.save();
+  ctx.shadowColor = theme.accent;
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+  ctx.strokeStyle = theme.secondary;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerR - 2.5, 0, Math.PI * 2);
+  ctx.strokeStyle = theme.primary + "44";
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+
+  // Outer ring
+  ctx.save();
+  ctx.shadowColor = theme.accent;
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+  ctx.strokeStyle = theme.secondary;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, outerR + 2, 0, Math.PI * 2);
+  ctx.strokeStyle = theme.primary + "30";
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+
+  // Vignette
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerR - 1, 0, Math.PI * 2);
+  ctx.clip();
+  const vg = ctx.createRadialGradient(cx, cy, innerR * 0.55, cx, cy, innerR);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(1, "rgba(0,0,0,0.4)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, size, size);
+  ctx.restore();
+}
+
+function render() {
+  const size = TOKEN_SIZE;
+  canvas.width = size;
+  canvas.height = size;
+  ctx.clearRect(0, 0, size, size);
+  const theme = THEMES[currentTheme];
+
+  // Image
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, INNER_RADIUS - 2, 0, Math.PI * 2);
+  ctx.clip();
+  if (imgEl) {
+    const w = imgEl.width * zoom;
+    const h = imgEl.height * zoom;
+    ctx.drawImage(imgEl, size / 2 - w / 2 + panX, size / 2 - h / 2 + panY, w, h);
+  } else {
+    ctx.fillStyle = "#0c0c14";
+    ctx.fillRect(0, 0, size, size);
+  }
+  ctx.restore();
+
+  drawTokenBorder(ctx, size, theme);
+}
+
+// --- Theme switching ---
+
+function applyThemeCSS(key) {
+  const t = THEMES[key];
+  const root = document.documentElement.style;
+  root.setProperty("--theme-primary", t.primary);
+  root.setProperty("--theme-secondary", t.secondary);
+  root.setProperty("--theme-accent", t.accent);
+  root.setProperty("--theme-glow", t.glow);
+  root.setProperty("--theme-glow-strong", t.glowStrong);
+}
+
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentTheme = btn.dataset.theme;
+    applyThemeCSS(currentTheme);
+    render();
+  });
+});
+
+// --- File handling ---
+
+function loadImage(file) {
+  if (!file || !file.type.startsWith("image/")) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    const diameter = INNER_RADIUS * 2;
+    zoomBase = Math.max(diameter / img.width, diameter / img.height);
+    imgEl = img;
+    zoom = zoomBase;
+    panX = 0; panY = 0;
+
+    zoomSlider.min = zoomBase * 0.4;
+    zoomSlider.max = zoomBase * 5;
+    zoomSlider.step = 0.001;
+    zoomSlider.value = zoom;
+    updateScaleLabel();
+
+    dropPrompt.classList.add("hidden");
+    controls.classList.remove("hidden");
+    canvas.style.cursor = "grab";
+    render();
+  };
+  img.src = url;
+}
+
+canvasWrap.addEventListener("drop", (e) => {
+  e.preventDefault();
+  canvas.classList.remove("drag-over");
+  loadImage(e.dataTransfer?.files?.[0]);
+});
+
+dropPrompt.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", () => { loadImage(fileInput.files?.[0]); fileInput.value = ""; });
+
+// --- Zoom ---
+
+function updateScaleLabel() {
+  const minZ = parseFloat(zoomSlider.min);
+  scaleValue.textContent = Math.round((zoom / minZ) * 50) + "%";
+}
+
+zoomSlider.addEventListener("input", () => {
+  zoom = parseFloat(zoomSlider.value);
+  updateScaleLabel();
+  render();
+});
+
+// --- Pan (pointer events for mouse + touch) ---
+
+canvas.addEventListener("pointerdown", (e) => {
+  if (!imgEl) return;
+  isDragging = true;
+  canvas.setPointerCapture(e.pointerId);
+  const rect = canvas.getBoundingClientRect();
+  const scaleRatio = TOKEN_SIZE / rect.width;
+  dragStartX = (e.clientX - rect.left) * scaleRatio - panX;
+  dragStartY = (e.clientY - rect.top) * scaleRatio - panY;
+  canvas.style.cursor = "grabbing";
+});
+
+canvas.addEventListener("pointermove", (e) => {
+  if (!isDragging) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleRatio = TOKEN_SIZE / rect.width;
+  panX = (e.clientX - rect.left) * scaleRatio - dragStartX;
+  panY = (e.clientY - rect.top) * scaleRatio - dragStartY;
+  render();
+});
+
+canvas.addEventListener("pointerup", () => { isDragging = false; if (imgEl) canvas.style.cursor = "grab"; });
+canvas.addEventListener("pointercancel", () => { isDragging = false; if (imgEl) canvas.style.cursor = "grab"; });
+
+// --- Buttons ---
+
+document.getElementById("btnClear").addEventListener("click", () => {
+  imgEl = null; zoom = 1; panX = 0; panY = 0;
+  dropPrompt.classList.remove("hidden");
+  controls.classList.add("hidden");
+  canvas.style.cursor = "default";
+  render();
+});
+
+document.getElementById("btnNew").addEventListener("click", () => fileInput.click());
+
+document.getElementById("btnSave").addEventListener("click", () => {
+  const link = document.createElement("a");
+  link.download = `token-${currentTheme}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+});
+
+// --- Init ---
+applyThemeCSS(currentTheme);
+render();
+</script>
+</body>
+</html>
