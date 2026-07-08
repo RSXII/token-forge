@@ -18,15 +18,22 @@
     --text-mid: #7a7a8a;
     --hover: #2e2e3a;
 
-    --theme-primary: #8b1a2b;
-    --theme-secondary: #c4344d;
-    --theme-accent: #ff4466;
-    --theme-glow: rgba(196, 52, 77, 0.4);
-    --theme-glow-strong: rgba(255, 68, 102, 0.6);
+    --theme-primary: #cc2040;
+    --theme-secondary: #f04060;
+    --theme-accent: #ff5577;
+    --theme-glow: rgba(255, 65, 100, 0.55);
+    --theme-glow-strong: rgba(255, 85, 119, 0.75);
   }
 
   body {
-    background: var(--bg);
+    background-color: var(--bg);
+    background-image:
+      linear-gradient(45deg, #111118 25%, transparent 25%),
+      linear-gradient(-45deg, #111118 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #111118 75%),
+      linear-gradient(-45deg, transparent 75%, #111118 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
     color: var(--text);
     font-family: 'Georgia', 'Times New Roman', serif;
     min-height: 100vh;
@@ -109,20 +116,17 @@
   /* Canvas area */
   .canvas-wrap {
     position: relative;
-    width: 420px;
-    height: 420px;
+    width: 484px;
+    height: 484px;
     margin-bottom: 28px;
   }
 
   #tokenCanvas {
-    border-radius: 50%;
-    box-shadow: 0 0 30px rgba(0,0,0,0.6), 0 0 15px var(--theme-glow);
-    transition: box-shadow 0.3s;
     touch-action: none;
   }
 
   #tokenCanvas.drag-over {
-    box-shadow: 0 0 40px var(--theme-glow-strong);
+    outline: 1px solid var(--theme-secondary);
   }
 
   .drop-prompt {
@@ -274,7 +278,7 @@
      ondragover="event.preventDefault(); document.getElementById('tokenCanvas').classList.add('drag-over');"
      ondragleave="document.getElementById('tokenCanvas').classList.remove('drag-over');"
 >
-  <canvas id="tokenCanvas" width="420" height="420"></canvas>
+  <canvas id="tokenCanvas" width="484" height="484"></canvas>
   <div class="drop-prompt" id="dropPrompt">
     <div class="drop-icon">↑</div>
     <div class="drop-label">Drop Portrait</div>
@@ -302,24 +306,26 @@
 
 <script>
 const TOKEN_SIZE = 420;
+const GUTTER = 32; // padding around the token so shadowBlur doesn't hard-clip
+const CANVAS_SIZE = TOKEN_SIZE + GUTTER * 2;
 const BORDER_BAND = 20;
 const INNER_RADIUS = TOKEN_SIZE / 2 - BORDER_BAND - 8;
 
 const THEMES = {
   enemy: {
-    primary: "#8b1a2b", secondary: "#c4344d", accent: "#ff4466",
-    glow: "rgba(196, 52, 77, 0.4)", glowStrong: "rgba(255, 68, 102, 0.6)",
-    ring: "#5a1020", filigree: "#a02040",
+    primary: "#cc2040", secondary: "#f04060", accent: "#ff5577",
+    glow: "rgba(255, 65, 100, 0.55)", glowStrong: "rgba(255, 85, 119, 0.75)",
+    ring: "#8a1830", filigree: "#e03355",
   },
   friendly: {
-    primary: "#1a6b5a", secondary: "#2a9e82", accent: "#40e0b8",
-    glow: "rgba(42, 158, 130, 0.35)", glowStrong: "rgba(64, 224, 184, 0.5)",
-    ring: "#0e3d32", filigree: "#1f7a64",
+    primary: "#18a085", secondary: "#30d4a8", accent: "#50ffd0",
+    glow: "rgba(48, 212, 168, 0.5)", glowStrong: "rgba(80, 255, 208, 0.65)",
+    ring: "#128868", filigree: "#28c09a",
   },
   neutral: {
-    primary: "#8b7330", secondary: "#c9a84c", accent: "#f0d060",
-    glow: "rgba(201, 168, 76, 0.35)", glowStrong: "rgba(240, 208, 96, 0.55)",
-    ring: "#5a4a18", filigree: "#b8952e",
+    primary: "#c49a30", secondary: "#e8be40", accent: "#ffe060",
+    glow: "rgba(232, 190, 64, 0.5)", glowStrong: "rgba(255, 224, 96, 0.65)",
+    ring: "#9a7820", filigree: "#d8ad38",
   },
 };
 
@@ -361,18 +367,7 @@ function drawTokenBorder(ctx, size, theme) {
   ctx.stroke();
   ctx.restore();
 
-  // Dark band fill
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
-  ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true);
-  const grad = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
-  grad.addColorStop(0, "#0a0a10");
-  grad.addColorStop(0.4, "#0f0f18");
-  grad.addColorStop(1, "#08080e");
-  ctx.fillStyle = grad;
-  ctx.fill();
-  ctx.restore();
+  // Band is fully transparent — no fill drawn here
 
   // Filigree
   const segCount = 8, segGap = 0.04;
@@ -475,28 +470,29 @@ function drawTokenBorder(ctx, size, theme) {
 }
 
 function render() {
-  const size = TOKEN_SIZE;
-  canvas.width = size;
-  canvas.height = size;
-  ctx.clearRect(0, 0, size, size);
+  canvas.width = CANVAS_SIZE;
+  canvas.height = CANVAS_SIZE;
+  ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
   const theme = THEMES[currentTheme];
 
-  // Image
+  // Offset all drawing by GUTTER so shadowBlur has room at every edge
+  ctx.save();
+  ctx.translate(GUTTER, GUTTER);
+
+  // Image clipped to inner circle
   ctx.save();
   ctx.beginPath();
-  ctx.arc(size / 2, size / 2, INNER_RADIUS - 2, 0, Math.PI * 2);
+  ctx.arc(TOKEN_SIZE / 2, TOKEN_SIZE / 2, INNER_RADIUS - 2, 0, Math.PI * 2);
   ctx.clip();
   if (imgEl) {
     const w = imgEl.width * zoom;
     const h = imgEl.height * zoom;
-    ctx.drawImage(imgEl, size / 2 - w / 2 + panX, size / 2 - h / 2 + panY, w, h);
-  } else {
-    ctx.fillStyle = "#0c0c14";
-    ctx.fillRect(0, 0, size, size);
+    ctx.drawImage(imgEl, TOKEN_SIZE / 2 - w / 2 + panX, TOKEN_SIZE / 2 - h / 2 + panY, w, h);
   }
   ctx.restore();
 
-  drawTokenBorder(ctx, size, theme);
+  drawTokenBorder(ctx, TOKEN_SIZE, theme);
+  ctx.restore();
 }
 
 // --- Theme switching ---
@@ -577,18 +573,18 @@ canvas.addEventListener("pointerdown", (e) => {
   isDragging = true;
   canvas.setPointerCapture(e.pointerId);
   const rect = canvas.getBoundingClientRect();
-  const scaleRatio = TOKEN_SIZE / rect.width;
-  dragStartX = (e.clientX - rect.left) * scaleRatio - panX;
-  dragStartY = (e.clientY - rect.top) * scaleRatio - panY;
+  const scaleRatio = CANVAS_SIZE / rect.width;
+  dragStartX = (e.clientX - rect.left) * scaleRatio - GUTTER - panX;
+  dragStartY = (e.clientY - rect.top) * scaleRatio - GUTTER - panY;
   canvas.style.cursor = "grabbing";
 });
 
 canvas.addEventListener("pointermove", (e) => {
   if (!isDragging) return;
   const rect = canvas.getBoundingClientRect();
-  const scaleRatio = TOKEN_SIZE / rect.width;
-  panX = (e.clientX - rect.left) * scaleRatio - dragStartX;
-  panY = (e.clientY - rect.top) * scaleRatio - dragStartY;
+  const scaleRatio = CANVAS_SIZE / rect.width;
+  panX = (e.clientX - rect.left) * scaleRatio - GUTTER - dragStartX;
+  panY = (e.clientY - rect.top) * scaleRatio - GUTTER - dragStartY;
   render();
 });
 
@@ -608,6 +604,7 @@ document.getElementById("btnClear").addEventListener("click", () => {
 document.getElementById("btnNew").addEventListener("click", () => fileInput.click());
 
 document.getElementById("btnSave").addEventListener("click", () => {
+  // Export full canvas including gutter — glow lives in that space
   const link = document.createElement("a");
   link.download = `token-${currentTheme}.png`;
   link.href = canvas.toDataURL("image/png");
